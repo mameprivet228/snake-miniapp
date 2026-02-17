@@ -1,6 +1,12 @@
 :root { color-scheme: light dark; }
-body {
+
+html, body {
   margin: 0;
+  padding: 0;
+  overscroll-behavior: none;
+}
+
+body {
   padding: 16px;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
   display: grid;
@@ -13,24 +19,66 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
-#restart {
-  padding: 8px 12px;
+.topBtns { display: flex; gap: 8px; }
+
+#restart, #pause {
+  padding: 8px 10px;
   border-radius: 10px;
   border: 1px solid #8884;
   background: transparent;
+  font-size: 14px;
+}
+
+.gameWrap {
+  position: relative;
+  width: min(92vw, 360px);
 }
 
 canvas {
-  width: min(92vw, 360px);
+  width: 100%;
   height: auto;
   border-radius: 16px;
   border: 1px solid #8884;
   background: #111;
   touch-action: none; /* важно для свайпов */
+  display: block;
 }
+
+/* Крестовина поверх поля */
+.pad {
+  position: absolute;
+  inset: 0;
+  pointer-events: none; /* чтобы свайпы по canvas работали */
+}
+
+/* Кнопки: включаем pointer-events только на самих кнопках */
+.padBtn {
+  pointer-events: auto;
+  position: absolute;
+
+  width: 64px;
+  height: 54px;
+  border-radius: 16px;
+  border: 1px solid #8886;
+  background: #0007;      /* полупрозрачные */
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+
+  font-size: 22px;
+  line-height: 1;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+.padBtn:active { transform: scale(0.98); }
+
+.padBtn.up   { left: 50%; top: 12px; transform: translateX(-50%); }
+.padBtn.down { left: 50%; bottom: 12px; transform: translateX(-50%); }
+.padBtn.left { left: 12px; top: 50%; transform: translateY(-50%); }
+.padBtn.right{ right: 12px; top: 50%; transform: translateY(-50%); }
 
 .hint {
   width: min(92vw, 360px);
