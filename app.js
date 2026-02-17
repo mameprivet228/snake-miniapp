@@ -9,19 +9,23 @@ const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const restartBtn = document.getElementById("restart");
+const pauseBtn = document.getElementById("pause");
 
-const GRID = 16;                 // 16x16 клеток
+// чтобы свайпы не превращались в скролл
+canvas.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
+
+const GRID = 16;
 const CELL = canvas.width / GRID;
-let tickMs = 120;
 
-let snake, dir, food, score, alive, timer;
+let baseTickMs = 120;
+let tickMs = baseTickMs;
+
+let snake, dir, food, score, alive, timer, paused = false;
 
 function same(a, b) { return a.x === b.x && a.y === b.y; }
-
 function randCell() {
   return { x: Math.floor(Math.random() * GRID), y: Math.floor(Math.random() * GRID) };
 }
-
 function spawnFood() {
   while (true) {
     const f = randCell();
@@ -30,9 +34,14 @@ function spawnFood() {
 }
 
 function setDir(nx, ny) {
-  // запрет разворота на 180°
+  if (!alive || paused) return;
   if (snake.length > 1 && nx === -dir.x && ny === -dir.y) return;
   dir = { x: nx, y: ny };
+}
+
+function startLoop() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(tick, tickMs);
 }
 
 function reset() {
@@ -41,18 +50,37 @@ function reset() {
   food = spawnFood();
   score = 0;
   alive = true;
-  tickMs = 120;
-  scoreEl.textContent = `Счёт: ${score}`;
 
-  if (timer) clearInterval(timer);
-  timer = setInterval(tick, tickMs);
+  paused = false;
+  pauseBtn.textContent = "⏸ Пауза";
+
+  baseTickMs = 120;
+  tickMs = baseTickMs;
+
+  scoreEl.textContent = `Счёт: ${score}`;
+  startLoop();
   draw();
+}
+
+function togglePause(forceState = null) {
+  if (!alive) return;
+
+  paused = forceState === null ? !paused : !!forceState;
+
+  if (paused) {
+    if (timer) clearInterval(timer);
+    pauseBtn.textContent = "▶ Продолжить";
+    draw(false, true);
+  } else {
+    pauseBtn.textContent = "⏸ Пауза";
+    startLoop();
+  }
 }
 
 function gameOver() {
   alive = false;
   if (timer) clearInterval(timer);
-  draw(true);
+  draw(true, false);
 
   if (tg) {
     tg.showPopup({
@@ -64,20 +92,13 @@ function gameOver() {
 }
 
 function tick() {
-  if (!alive) return;
+  if (!alive || paused) return;
 
   const head = snake[0];
   const next = { x: head.x + dir.x, y: head.y + dir.y };
 
-  // столкновение со стеной
-  if (next.x < 0 || next.x >= GRID || next.y < 0 || next.y >= GRID) {
-    return gameOver();
-  }
-
-  // столкновение с собой
-  if (snake.some((s, i) => i !== 0 && same(s, next))) {
-    return gameOver();
-  }
+  if (next.x < 0 || next.x >= GRID || next.y < 0 || next.y >= GRID) return gameOver();
+  if (snake.some((s, i) => i !== 0 && same(s, next))) return gameOver();
 
   snake.unshift(next);
 
@@ -86,11 +107,10 @@ function tick() {
     scoreEl.textContent = `Счёт: ${score}`;
     food = spawnFood();
 
-    // чуть ускоряемся
+    // ускорение каждые 5 очков
     if (score % 5 === 0 && tickMs > 60) {
       tickMs -= 8;
-      clearInterval(timer);
-      timer = setInterval(tick, tickMs);
+      startLoop();
     }
   } else {
     snake.pop();
@@ -123,10 +143,10 @@ function drawCell(x, y, color) {
   ctx.fill();
 }
 
-function draw(isGameOver = false) {
+function draw(isGameOver = false, isPaused = false) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // лёгкая сетка
+  // сетка
   ctx.globalAlpha = 0.12;
   ctx.strokeStyle = "#fff";
   for (let i = 1; i < GRID; i++) {
@@ -135,33 +155,31 @@ function draw(isGameOver = false) {
   }
   ctx.globalAlpha = 1;
 
-  // еда
   drawCell(food.x, food.y, "#ff4d4d");
-
-  // змея
   snake.forEach((s, i) => drawCell(s.x, s.y, i === 0 ? "#7CFF6B" : "#38bdf8"));
 
-  if (isGameOver) {
+  if (isGameOver || isPaused) {
     ctx.fillStyle = "#000a";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#fff";
     ctx.font = "20px system-ui";
     ctx.textAlign = "center";
-    ctx.fillText("GAME OVER", canvas.width / 2, canvas.height / 2);
+    ctx.fillText(isGameOver ? "GAME OVER" : "PAUSED", canvas.width / 2, canvas.height / 2);
   }
 }
 
-// Управление стрелками (ПК)
+// клавиатура
 window.addEventListener("keydown", (e) => {
   if (e.key === "ArrowUp") setDir(0, -1);
   if (e.key === "ArrowDown") setDir(0, 1);
   if (e.key === "ArrowLeft") setDir(-1, 0);
   if (e.key === "ArrowRight") setDir(1, 0);
+
+  if (e.key.toLowerCase() === "p") togglePause();
 });
 
-// Управление свайпами (мобилка/Telegram)
+// свайпы
 let touchStart = null;
-
 canvas.addEventListener("touchstart", (e) => {
   const t = e.changedTouches[0];
   touchStart = { x: t.clientX, y: t.clientY };
@@ -180,6 +198,37 @@ canvas.addEventListener("touchend", (e) => {
   else setDir(0, dy > 0 ? 1 : -1);
 }, { passive: true });
 
+// кнопки поверх
+const upBtn = document.getElementById("up");
+const downBtn = document.getElementById("down");
+const leftBtn = document.getElementById("left");
+const rightBtn = document.getElementById("right");
+
+function bindDirButton(btn, x, y) {
+  if (!btn) return;
+
+  btn.addEventListener("click", () => setDir(x, y));
+  btn.addEventListener("touchstart", (e) => {
+    e.preventDefault();
+    setDir(x, y);
+  }, { passive: false });
+}
+
+bindDirButton(upBtn, 0, -1);
+bindDirButton(downBtn, 0, 1);
+bindDirButton(leftBtn, -1, 0);
+bindDirButton(rightBtn, 1, 0);
+
+// кнопки сверху
 restartBtn.addEventListener("click", reset);
+pauseBtn.addEventListener("click", () => togglePause());
+
+// авто-пауза при сворачивании
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) togglePause(true);
+});
+
+// если Mini App свернули средствами Telegram
+tg?.onEvent?.("viewportChanged", () => { /* можно расширять при желании */ });
 
 reset();
