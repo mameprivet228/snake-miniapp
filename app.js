@@ -26,6 +26,8 @@ const difficultySel = document.getElementById("difficulty");
 const wallsSel = document.getElementById("walls");
 const soundToggleBtn = document.getElementById("soundToggle");
 const hapticToggleBtn = document.getElementById("hapticToggle");
+const controlsToggleBtn = document.getElementById("controlsToggle");
+const controlsBlock = document.querySelector(".controls");
 
 const upBtn = document.getElementById("up");
 const downBtn = document.getElementById("down");
@@ -36,13 +38,14 @@ const rightBtn = document.getElementById("right");
 canvas.addEventListener("touchmove", (e) => e.preventDefault(), { passive: false });
 
 /* ---------- SETTINGS / STORAGE ---------- */
-const KEY = "snake_mini_settings_v1";
+const KEY = "snake_mini_settings_v2";
 
 const defaultSettings = {
   difficulty: "normal",
-  walls: "solid", // solid | wrap
+  walls: "solid",   // solid | wrap
   sound: true,
   haptic: true,
+  controls: true,   // кнопки снизу
   best: 0,
 };
 
@@ -67,12 +70,6 @@ difficultySel.value = settings.difficulty;
 wallsSel.value = settings.walls;
 bestEl.textContent = `Рекорд: ${settings.best}`;
 
-function updateToggleTexts() {
-  soundToggleBtn.textContent = settings.sound ? "🔊 Звук: ВКЛ" : "🔇 Звук: ВЫКЛ";
-  hapticToggleBtn.textContent = settings.haptic ? "📳 Вибро: ВКЛ" : "📴 Вибро: ВЫКЛ";
-}
-updateToggleTexts();
-
 /* ---------- SOUND / HAPTIC ---------- */
 let audioCtx = null;
 
@@ -88,7 +85,7 @@ function beep(freq = 880, ms = 55, gainVal = 0.06) {
     o.connect(g);
     g.connect(audioCtx.destination);
     o.start();
-    setTimeout(() => { o.stop(); }, ms);
+    setTimeout(() => o.stop(), ms);
   } catch {}
 }
 
@@ -96,6 +93,20 @@ function haptic(type = "light") {
   if (!settings.haptic) return;
   try { tg?.HapticFeedback?.impactOccurred?.(type); } catch {}
 }
+
+function updateToggleTexts() {
+  soundToggleBtn.textContent = settings.sound ? "🔊 Звук: ВКЛ" : "🔇 Звук: ВЫКЛ";
+  hapticToggleBtn.textContent = settings.haptic ? "📳 Вибро: ВКЛ" : "📴 Вибро: ВЫКЛ";
+  controlsToggleBtn.textContent = settings.controls ? "🎮 Кнопки: ВКЛ" : "🎮 Кнопки: ВЫКЛ";
+}
+
+function applyControlsVisibility() {
+  if (!controlsBlock) return;
+  controlsBlock.style.display = settings.controls ? "" : "none";
+}
+
+updateToggleTexts();
+applyControlsVisibility();
 
 /* ---------- GAME ---------- */
 const GRID = 16;
@@ -118,7 +129,7 @@ function difficultyToTick(d) {
   if (d === "easy") return 145;
   if (d === "normal") return 120;
   if (d === "hard") return 95;
-  return 75; // insane
+  return 75;
 }
 
 function setDir(nx, ny) {
@@ -152,6 +163,7 @@ function startGame() {
   resetGameState();
   startLoop();
   gameStarted = true;
+
   subhintEl.textContent = settings.walls === "wrap" ? "Режим: сквозь стены" : "Режим: стены (классика)";
   footerEl.textContent = `Сложность: ${difficultySel.options[difficultySel.selectedIndex].text}`;
   draw();
@@ -224,7 +236,6 @@ function tick() {
     beep(880, 40, 0.05);
     food = spawnFood();
 
-    // микро-ускорение каждые 7 очков (не до бесконечности)
     if (score % 7 === 0 && tickMs > 55) {
       tickMs -= 5;
       startLoop();
@@ -238,7 +249,7 @@ function tick() {
   draw();
 }
 
-/* ---------- RENDER (funny snake) ---------- */
+/* ---------- RENDER ---------- */
 function drawGrid() {
   ctx.globalAlpha = 0.10;
   ctx.strokeStyle = "#ffffff";
@@ -283,7 +294,6 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 
 function drawSnake() {
-  // тело
   snake.forEach((s, i) => {
     const pad = 1.5;
     const x = s.x * CELL + pad;
@@ -301,7 +311,6 @@ function drawSnake() {
     ctx.fill();
   });
 
-  // голова + глаза
   const head = snake[0];
   const hx = head.x * CELL;
   const hy = head.y * CELL;
@@ -317,14 +326,12 @@ function drawSnake() {
   ctx.arc(cx + CELL * 0.12 + ey, cy - CELL * 0.10 - ex, CELL * 0.06, 0, Math.PI * 2);
   ctx.fill();
 
-  // зрачки (в сторону движения)
   ctx.fillStyle = "#ffffff";
   ctx.beginPath();
   ctx.arc(cx - CELL * 0.12 + ey + dir.x * CELL * 0.03, cy - CELL * 0.10 - ex + dir.y * CELL * 0.03, CELL * 0.025, 0, Math.PI * 2);
   ctx.arc(cx + CELL * 0.12 + ey + dir.x * CELL * 0.03, cy - CELL * 0.10 - ex + dir.y * CELL * 0.03, CELL * 0.025, 0, Math.PI * 2);
   ctx.fill();
 
-  // язычок
   ctx.strokeStyle = "#ff4d4d";
   ctx.lineWidth = 2.2;
   ctx.lineCap = "round";
@@ -344,7 +351,6 @@ function drawOverlayText(text) {
 }
 
 function draw(isGameOver = false, isPaused = false) {
-  // фон
   const grad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
   grad.addColorStop(0, "#0b1328");
   grad.addColorStop(1, "#070a12");
@@ -388,31 +394,54 @@ canvas.addEventListener("touchend", (e) => {
 }, { passive: true });
 
 function bindDirButton(btn, x, y) {
-  btn.addEventListener("click", () => setDir(x, y));
-  btn.addEventListener("touchstart", (e) => {
+  const handler = (e) => {
     e.preventDefault();
     setDir(x, y);
-  }, { passive: false });
+  };
+  btn.addEventListener("click", handler);
+  btn.addEventListener("touchstart", handler, { passive: false });
+  btn.addEventListener("pointerup", handler);
 }
 bindDirButton(upBtn, 0, -1);
 bindDirButton(downBtn, 0, 1);
 bindDirButton(leftBtn, -1, 0);
 bindDirButton(rightBtn, 1, 0);
 
-/* ---------- UI EVENTS ---------- */
+/* ---------- MENU / UI (iOS-proof) ---------- */
 function openMenu() {
   overlay.hidden = false;
-  // на всякий — пауза
   if (gameStarted && alive) togglePause(true);
 }
+
 function closeMenu() {
   overlay.hidden = true;
 }
 
-menuBtn.addEventListener("click", openMenu);
-closeMenuBtn.addEventListener("click", closeMenu);
+function bindTap(el, fn) {
+  if (!el) return;
+  const handler = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fn();
+  };
+  el.addEventListener("click", handler);
+  el.addEventListener("touchstart", handler, { passive: false });
+  el.addEventListener("pointerup", handler);
+}
 
-startGameBtn.addEventListener("click", () => {
+bindTap(menuBtn, openMenu);
+bindTap(closeMenuBtn, closeMenu);
+
+// закрыть тапом по затемнению
+overlay.addEventListener("click", (e) => {
+  if (e.target === overlay) closeMenu();
+});
+overlay.addEventListener("touchstart", (e) => {
+  if (e.target === overlay) closeMenu();
+}, { passive: true });
+
+// старт
+bindTap(startGameBtn, () => {
   settings.difficulty = difficultySel.value;
   settings.walls = wallsSel.value;
   saveSettings();
@@ -420,30 +449,31 @@ startGameBtn.addEventListener("click", () => {
   startGame();
 });
 
-difficultySel.addEventListener("change", () => {
-  settings.difficulty = difficultySel.value;
-  saveSettings();
-});
-wallsSel.addEventListener("change", () => {
-  settings.walls = wallsSel.value;
-  saveSettings();
-});
-
-soundToggleBtn.addEventListener("click", () => {
+// переключатели
+bindTap(soundToggleBtn, () => {
   settings.sound = !settings.sound;
   updateToggleTexts();
   saveSettings();
   beep(settings.sound ? 660 : 220, 60, 0.06);
 });
 
-hapticToggleBtn.addEventListener("click", () => {
+bindTap(hapticToggleBtn, () => {
   settings.haptic = !settings.haptic;
   updateToggleTexts();
   saveSettings();
   haptic("light");
 });
 
-resetBestBtn.addEventListener("click", () => {
+bindTap(controlsToggleBtn, () => {
+  settings.controls = !settings.controls;
+  updateToggleTexts();
+  saveSettings();
+  applyControlsVisibility();
+  haptic("light");
+});
+
+// сброс рекорда
+bindTap(resetBestBtn, () => {
   settings.best = 0;
   saveSettings();
   bestEl.textContent = `Рекорд: ${settings.best}`;
@@ -451,18 +481,19 @@ resetBestBtn.addEventListener("click", () => {
   beep(440, 60, 0.06);
 });
 
+// верхние кнопки
 restartBtn.addEventListener("click", () => {
   if (!gameStarted) openMenu();
   else startGame();
 });
-
 pauseBtn.addEventListener("click", () => togglePause());
 
+// авто-пауза при сворачивании
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) togglePause(true);
 });
 
-// стартовый экран
+// initial
 bestEl.textContent = `Рекорд: ${settings.best}`;
 draw();
-openMenu(); // сразу показываем меню при первом запуске
+openMenu();
