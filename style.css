@@ -32,7 +32,7 @@ body {
 }
 
 .scoreblock { display: grid; gap: 2px; }
-.score { font-size: 18px; font-weight: 800; letter-spacing: 0.2px; }
+.score { font-size: 18px; font-weight: 900; letter-spacing: 0.2px; }
 .best { font-size: 12px; opacity: .75; }
 
 .topBtns { display: flex; gap: 8px; }
@@ -127,7 +127,10 @@ canvas {
   place-items: center;
   padding: 16px;
   z-index: 50;
+  -webkit-tap-highlight-color: transparent;
 }
+
+.overlay[hidden] { display: none !important; }
 
 .modal {
   width: min(92vw, 420px);
@@ -141,6 +144,8 @@ canvas {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
+
+.modal, .modal * { pointer-events: auto; }
 
 .modalTitle { font-size: 18px; font-weight: 900; }
 .modalText { font-size: 13px; opacity: .8; }
@@ -182,7 +187,7 @@ select {
 .primary {
   border-color: #7dd3fc66;
   background: linear-gradient(180deg, #0b2a4a 0%, #081124 100%);
-  font-weight: 800;
+  font-weight: 900;
 }
 
 .danger {
